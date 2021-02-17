@@ -1,2 +1,0 @@
-1:1-1:1::MyList.$trModule :: "GHC.Types.Module"
-6:1-6:7::MyList.insert :: "forall a . a -> (MyList.MyList a) -> (MyList.MyList a)"
