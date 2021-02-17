@@ -1,0 +1,2 @@
+1:1-1:1::MyVector.$trModule :: "GHC.Types.Module"
+11:1-11:13::MyVector.insertVector :: "forall a b .\na -> (MyVector.MyVector b a) -> (MyVector.MyVector ('MyVector.S b) a)"
