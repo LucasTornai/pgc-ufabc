@@ -13,3 +13,17 @@ data MyBST a where
 validBST = Node 5 Empty (Node 11 Empty Empty)
 
 --invalidBST = Node 5 (Node 11 Empty Empty) Empty
+
+insert :: Ord a => a -> MyBST a -> MyBST a
+insert x Empty = Node x Empty Empty
+insert x (Node v l r)
+  | x < v = Node v (insert x l) r
+  | x > v = Node v l (insert x r)
+  | otherwise = Node v l r
+
+--invalidInsert :: Ord a => a -> MyBST a -> MyBST a
+--invalidInsert x Empty = Node x Empty Empty
+--invalidInsert x (Node v l r)
+--  | x < v = Node v l (insert x r)
+--  | x > v = Node v l (insert x r)
+--  | otherwise = Node v l r

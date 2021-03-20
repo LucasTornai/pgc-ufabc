@@ -9,3 +9,5 @@ data MyVector l a where
 
 insertVector :: a -> MyVector l a -> MyVector (S l) a
 insertVector = Cons
+
+a = Cons 1 Nil
