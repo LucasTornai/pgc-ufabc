@@ -84,7 +84,7 @@ insert x (Node Empty y Empty) (IsBSTOne y) =
                                Right _     => (Node Empty y Empty ** (IsBSTOne y))
 insert x (Node l y Empty) (IsBSTLft y l isLftPrf lPrf) =
   let (tx ** px) = insert x Empty IsBSTZero
-      (tl  ** pl) = insert x l lPrf
+      (tl ** pl) = insert x l lPrf
   in case choose (less y tx) of
           Left prfRgt => (Node l y tx ** IsBSTMore y l tx isLftPrf prfRgt lPrf px)
           Right _ => case choose (more y tl) of
@@ -92,10 +92,14 @@ insert x (Node l y Empty) (IsBSTLft y l isLftPrf lPrf) =
                           Right _ => (Node l y Empty ** (IsBSTLft y l isLftPrf lPrf))
 insert x (Node Empty y r) (IsBSTRgt y r isRgtPrf rPrf) =
   let (tx ** px) = insert x Empty IsBSTZero
-      (tr  ** pr) = insert x r rPrf
+      (tr ** pr) = insert x r rPrf
   in case choose (more y tx) of
           Left prfLft => (Node tx y r ** IsBSTMore y tx r prfLft isRgtPrf px rPrf)
           Right _ => case choose (less y tr) of
                           Left prfRgt => (Node Empty y tr ** IsBSTRgt y tr prfRgt pr)
                           Right _ => (Node Empty y r ** (IsBSTRgt y r isRgtPrf rPrf))
- 
+insert x (Node l y r) (IsBSTMore y l r isLftPrf isRgtPrf lPrf rPrf) =
+  let (tx ** px) = insert x Empty IsBSTZero
+  in case choose (more y tx) of
+          Left _ => insert x l lPrf
+          Right _ => insert x r rPrf 
