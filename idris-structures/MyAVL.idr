@@ -80,51 +80,49 @@ height (Node l v r) = 1 + (max (height l) (height r))
 isImba: Int -> Int -> Bool
 isImba x y = (x - 1) > y
 
-isBal: Ord a => Tree a -> Type
-isBal Empty = So True
+isBal: Ord a => Tree a -> Bool
+isBal Empty = True
 isBal (Node l v r) =
   let hl = height l
       hr = height r
-  in So (not (isImba hl hr) && not (isImba hr hl))
+  in (not (isImba hl hr) && not (isImba hr hl))
 
-data Balance = ImbL | Bal | ImbR
+IsBal : Ord a => Tree a -> Type
+IsBal x = So (isBal x)
 
-checkBalance: Ord a => Tree a -> Balance
-checkBalance Empty = Bal
-checkBalance (Node l v r) =
-  let hl = height l
-      hr = height r
-  in case isImba hl hr of
-          True => ImbL
-          False => case isImba hr hl of
-                        True => ImbR
-                        False => Bal
+data IsBalanced : (t : Tree a) -> Type where
+  IsBalancedZero : IsBalanced Empty
+  IsBalancedOne  : Ord a => (x: a) -> IsBalanced (Node Empty x Empty)
+  IsBalancedLft  : Ord a => (x: a) -> (l: Tree a) -> (IsBal (Node l x Empty)) -> (IsBalanced l)-> IsBalanced (Node l x Empty)
+  IsBalancedRgt  : Ord a => (x: a) -> (r: Tree a) -> (IsBal (Node Empty x r)) -> (IsBalanced r) -> IsBalanced (Node Empty x r)
+  IsBalancedMore : Ord a => (x: a) -> (l: Tree a) -> (r: Tree a) -> (IsBal (Node l x r)) -> (IsBalanced l) -> (IsBalanced r) -> IsBalanced (Node l x r)
 
+--data IsAVL : Tree a -> Type where
+--  IsAVLTree: Ord a => (t: Tree a) -> (IsBST t) -> (IsBalanced t) -> IsAVL t
 
-
-insert : Ord a => (x : a) -> (t : Tree a) -> (IsBST t) -> (t' : (Tree a) ** (IsBST t'))
-insert x Empty IsBSTZero  = ((Node Empty x Empty) ** (IsBSTOne x))
-insert x (Node Empty y Empty) (IsBSTOne y) =
-   let (tx ** px) = insert x Empty IsBSTZero
-   in  case choose (more y tx) of
-           Left prfLft => (Node tx y Empty ** (IsBSTLft y tx prfLft px))
-           Right _     => case choose (less y tx) of
-                               Left prfRgt => (Node Empty y tx ** (IsBSTRgt y tx prfRgt px))
-                               Right _     => (Node Empty y Empty ** (IsBSTOne y))
-insert x (Node l y Empty) (IsBSTLft y l isLftPrf lPrf) =
-  let (tx ** px) = insert x Empty IsBSTZero
-      (tl  ** pl) = insert x l lPrf
-  in case choose (less y tx) of
-          Left prfRgt => (Node l y tx ** IsBSTMore y l tx isLftPrf prfRgt lPrf px)
-          Right _ => case choose (more y tl) of
-                          Left prfLft => (Node tl y Empty ** IsBSTLft y tl prfLft pl)
-                          Right _ => (Node l y Empty ** (IsBSTLft y l isLftPrf lPrf))
-insert x (Node Empty y r) (IsBSTRgt y r isRgtPrf rPrf) =
-  let (tx ** px) = insert x Empty IsBSTZero
-      (tr  ** pr) = insert x r rPrf
+insert: Ord a => (x: a) -> (t: Tree a) -> (IsBST t) -> (IsBalanced t) -> (t' : (Tree a) ** (IsBST t', IsBalanced t'))
+insert x Empty IsBSTZero IsBalancedZero = ((Node Empty x Empty) ** (IsBSTOne x, IsBalancedOne x))
+insert x (Node Empty y Empty) (IsBSTOne y) (IsBalancedOne y) =
+  let (tx ** (pbstx, pbalx)) = insert x Empty IsBSTZero IsBalancedZero
   in case choose (more y tx) of
-          Left prfLft => (Node tx y r ** IsBSTMore y tx r prfLft isRgtPrf px rPrf)
-          Right _ => case choose (less y tr) of
-                          Left prfRgt => (Node Empty y tr ** IsBSTRgt y tr prfRgt pr)
-                          Right _ => (Node Empty y r ** (IsBSTRgt y r isRgtPrf rPrf))
+          Left prfLft => case choose (isBal (Node tx y Empty)) of
+                              Left prfBLft => ((Node tx y Empty) ** (IsBSTLft y tx prfLft pbstx, IsBalancedLft y tx prfBLft pbalx))
+                              Right _ => ?aaa
+          Right _     => case choose (less y tx) of
+                              Left prfRgt => case choose (isBal (Node Empty y tx)) of
+                                                  Left prfBRgt => ((Node Empty y tx) ** (IsBSTRgt y tx prfRgt pbstx, IsBalancedRgt y tx prfBRgt pbalx))
+                                                  Right _      => ((Node Empty y Empty) ** (IsBSTOne y, IsBalancedOne y))
+                              Right _     => ((Node Empty y Empty) ** (IsBSTOne y, IsBalancedOne y))
+insert x (Node l y Empty) (IsBSTLft y l isLftPrf lPrf) (IsBalancedLft y l isBalPrf lBalPrf) =
+  let (tx ** (pbstx, pbalx)) = insert x Empty IsBSTZero IsBalancedZero
+      (tl ** (pbstl, pball)) = insert x l lPrf lBalPrf
+  in case choose (less y tx) of
+          Left prfRgt => case choose (isBal (Node l y tx)) of
+                              Left prfBRgt => (Node l y tx ** (IsBSTMore y l tx isLftPrf prfRgt lPrf pbstx, IsBalancedMore y l tx prfBRgt lBalPrf pbalx))
+                              Right _ => ?bbb
+          Right _ => case choose (more y tl) of
+                          Left prfLft => case choose (isBal (Node tl y Empty)) of
+                                              Left prfBLft => ((Node tl y Empty) ** (IsBSTLft y tl prfLft pl, IsBalancedLft y tl prfBLft pball))
+                                              Right _ => ?ccc
+                          Right _     => ((Node l y Empty) ** (IsBSTLft y l isLftPrf lPrf, IsBalancedLft  y l isBalPrf lBalPrf))
  
