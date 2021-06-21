@@ -1,96 +1,118 @@
 {-# LANGUAGE DataKinds, GADTs, TypeOperators #-}
 {-@ LIQUID "--no-termination" @-}
-module MyAVL where
--- https://gist.github.com/timjb/8292342
--- https://ucsd-progsys.github.io/liquidhaskell-tutorial/Tutorial_12_Case_Study_AVL.html
 
-{-@ data MyAVL a = Empty
-               | Node { v :: a
-                      , l :: AVLL a v
-                      , r :: {k:AVLR a v | isBal l k 1}
-                      , h :: {k:Nat        | isReal k l r}
-                      }                                  @-}
-{-@ type AVLL a X = MyAVL {v:a | v < X}  @-}
-{-@ type AVLR a X = MyAVL {v:a | X < v}  @-}
-data MyAVL a =
-    Empty
-  | Node { v :: a
-         , l :: MyAVL a
-         , r :: MyAVL a
-         , h :: Int
-         }
+import Prelude hiding (max)
+
+{-@ data AVL a =
+  Leaf
+  | Node {
+    key    :: a,
+    left   :: AVLL a key,
+    right  :: {v:AVLR a key | isBalanced left v 1},
+    height :: {v:Nat | isRealHeight v left right}
+  }
+@-}
+data AVL a = Leaf | Node { key :: a, left :: AVL a, right :: AVL a, height :: Int } deriving (Show)
+
+{-@ type AVLL a X = AVL {v:a | v < X} @-}
+{-@ type AVLR a X = AVL {v:a | v > X} @-}
 
 {-@ measure realHeight @-}
-realHeight :: MyAVL a -> Int
-realHeight Empty          = 0
-realHeight (Node _ l r _) = nodeHeight l r
+{-@ lazy realHeight @-}
+{-@ realHeight                   :: AVL a -> Nat @-}
+realHeight                       :: AVL a -> Int
+realHeight Leaf                  =  0
+realHeight (Node _ left right _) =  nodeHeight left right
 
 {-@ inline nodeHeight @-}
-nodeHeight :: MyAVL a -> MyAVL a -> Int
-nodeHeight l r = 1 + myMax hl hr
-  where
-    hl         = realHeight l
-    hr         = realHeight r
+{-@ nodeHeight        :: AVL a -> AVL a -> Nat @-}
+nodeHeight            :: AVL a -> AVL a -> Int
+nodeHeight left right =  1 + max (realHeight left) (realHeight right)
 
-{-@ inline myMax @-}
-myMax :: Int -> Int -> Int
-myMax x y = if x > y then x else y
+{-@ inline max @-}
+{-@ max :: Nat -> Nat -> Nat @-}
+max     :: Int -> Int -> Int
+max x y =  if x > y then x else y
 
-{-@ inline isReal @-}
-isReal :: Int -> MyAVL a -> MyAVL a -> Bool
-isReal v l r = v == nodeHeight l r
+{-@ inline isRealHeight @-}
+{-@ isRealHeight          :: h:Nat -> left:AVL a -> right:AVL a -> Bool @-}
+isRealHeight              :: Int -> AVL a -> AVL a -> Bool
+isRealHeight h left right =  h == nodeHeight left right
 
-{-@ inline isBal @-}
-isBal :: MyAVL a -> MyAVL a -> Int -> Bool
-isBal l r n = 0 - n <= d && d <= n
-  where
-    d       = realHeight l - realHeight r
+{-@ inline isBalanced @-}
+{-@ isBalanced          :: left:AVL a -> right:AVL a -> n:Nat -> Bool @-}
+isBalanced              :: AVL a -> AVL a -> Int -> Bool
+isBalanced left right n =  (0 - n) <= d && d <= n
+  where d               =  (getHeight left) - (getHeight right)
 
-{-@ type AVLN a N = {v: MyAVL a | realHeight v = N} @-}
+{-@ type AVLN a N = {v:AVL a | realHeight v = N} @-}
+
 {-@ type AVLT a T = AVLN a {realHeight T} @-}
 
 {-@ empty :: AVLN a 0 @-}
-empty = Empty
+empty     :: AVL a
+empty     =  Leaf
 
 {-@ singleton :: a -> AVLN a 1 @-}
-singleton x =  Node x empty empty 1
+singleton     :: a -> AVL a
+singleton x   =  Node x empty empty 1
+
+{-@ mkNode          :: key:a -> left:AVLL a key -> {right:AVLR a key | isBalanced left right 1} -> {v:AVL a | realHeight v = nodeHeight left right} @-}
+mkNode              :: a -> AVL a -> AVL a -> AVL a
+mkNode x left right =  Node x left right h
+  where h           =  nodeHeight left right
 
 {-@ measure getHeight @-}
-getHeight Empty          = 0
-getHeight (Node _ _ _ n) = n
-
-{-@ mkNode :: v:a -> l:AVLL a v -> r:{k:AVLR a v | isBal l k 1}
-           -> AVLN a {nodeHeight l r}
-  @-}
-mkNode v l r = Node v l r (nodeHeight l r)
+{-@ getHeight            :: t:AVL a -> {v:Nat | v = realHeight t} @-}
+getHeight Leaf           =  0
+getHeight (Node _ _ _ h) =  h
 
 {-@ inline leftBig @-}
-leftBig l r = diff l r == 2
+{-@ leftBig        :: left:AVL a -> right:AVL a -> Bool @-}
+leftBig            :: AVL a -> AVL a -> Bool
+leftBig left right =  getHeight left - getHeight right == 2
 
 {-@ inline rightBig @-}
-rightBig l r = diff r l == 2
+{-@ rightBig        :: left:AVL a -> right:AVL a -> Bool @-}
+rightBig            :: AVL a -> AVL a -> Bool
+rightBig left right =  getHeight right - getHeight left == 2
+
+{-@ measure balanceFactor @-}
+balanceFactor                       :: AVL a -> Int
+balanceFactor Leaf                  =  0
+balanceFactor (Node _ left right _) =  getHeight left - getHeight right
+
+{-@ inline leftHeavy @-}
+leftHeavy t = balanceFactor t > 0
+
+{-@ inline rightHeavy @-}
+rightHeavy t = balanceFactor t < 0
+
+{-@ inline noHeavy @-}
+noHeavy t = balanceFactor t == 0
 
 {-@ inline diff @-}
 diff s t = getHeight s - getHeight t
 
-{-@ measure balFac @-}
-balFac Empty          = 0
-balFac (Node _ l r _) = getHeight l - getHeight r
+-- Ensure code is unreachable
+{-@ die :: {s:String | false} -> a @-}
+die :: String -> a
+die = error
 
-{-@ inline leftHeavy @-}
-leftHeavy  t = balFac t > 0
+-- For use with Lemmas 
+assert _ y = y
 
-{-@ inline rightHeavy @-}
-rightHeavy t = balFac t < 0
-
-{-@ inline noHeavy @-}
-noHeavy    t = balFac t == 0
+{-@ measure isNode @-}
+isNode      :: AVL a -> Bool
+isNode Leaf =  False
+isNode _    =  True
 
 {-@ balL0 :: x:a
           -> l:{AVLL a x | noHeavy l}
           -> r:{AVLR a x | leftBig l r}
-          -> AVLN a {realHeight l + 1 }
+          -> AVLN a {realHeight l + 1}
   @-}
+balL0 :: a -> AVL a -> AVL a -> AVL a -- Bool
 balL0 v (Node lv ll lr _) r = mkNode lv ll (mkNode v lr r)
 
 {-@ balLL :: x:a
@@ -130,8 +152,8 @@ balRR v l (Node rv rl rr _) = mkNode rv (mkNode v l rl) rr
   @-}
 balRL v l (Node rv (Node rlv rll rlr _) rr _) = mkNode rlv (mkNode v l rll) (mkNode rv rlr rr)
 
-{-@ insert :: a -> s:MyAVL a -> {t: MyAVL a | eqOrUp s t} @-}
-insert y Empty = singleton y
+{-@ insert :: a -> s:AVL a -> {t: AVL a | eqOrUp s t} @-}
+insert y Leaf = singleton y
 insert y t@(Node x _ _ _)
   | y < x     = insL y t
   | y > x     = insR y t
@@ -143,8 +165,8 @@ eqOrUp s t = d == 0 || d == 1
     d      = diff t s
 
 {-@ insL :: x:a
-         -> t:{MyAVL a | x < v t && 0 < realHeight t}
-         -> {v: MyAVL a | eqOrUp t v}
+         -> t:{AVL a | x < key t && 0 < realHeight t}
+         -> {v: AVL a | eqOrUp t v}
   @-}
 insL a (Node v l r _)
   | isLeftBig && leftHeavy l'  = balLL v l' r
@@ -156,8 +178,8 @@ insL a (Node v l r _)
     l'                         = insert a l
 
 {-@ insR :: x:a
-         -> t:{MyAVL a  | v t < x && 0 < realHeight t }
-         -> {v: MyAVL a | eqOrUp t v}
+         -> t:{AVL a  | key t < x && 0 < realHeight t }
+         -> {v: AVL a | eqOrUp t v}
   @-}
 insR a (Node v l r _)
   | isRightBig && rightHeavy r' = balRR v l r'
@@ -167,3 +189,7 @@ insR a (Node v l r _)
   where
     isRightBig                  = rightBig l r'
     r'                          = insert a r
+
+-- This is probably a bug in Liquid Haskell, the tutorial doesn't have this invariant and breaks.
+-- It should be computed from the other definitions we describe in the code.
+{-@ invariant {v: AVL a | getHeight v == realHeight v} @-}

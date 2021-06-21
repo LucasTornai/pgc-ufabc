@@ -2,28 +2,28 @@
 module MyBST where
 
 {-@ data MyBST a where
-      Empty :: MyBST a
-      | Node :: v : a -> l : BSTL a v -> r : BSTR a v -> MyBST a @-}
+      Leaf :: MyBST a
+      | Node :: key : a -> left : BSTL a key -> right : BSTR a key -> MyBST a @-}
 {-@ type BSTL a X = MyBST {vl: a | vl < X} @-}
 {-@ type BSTR a X = MyBST {vr: a | vr > X} @-}
 data MyBST a where
-  Empty :: Ord a => MyBST a
+  Leaf :: Ord a => MyBST a
   Node :: Ord a => a -> MyBST a -> MyBST a -> MyBST a
 
-validBST = Node 5 Empty (Node 11 Empty Empty)
+validBST = Node 5 Leaf (Node 11 Leaf Leaf)
 
---invalidBST = Node 5 (Node 11 Empty Empty) Empty
+--invalidBST = Node 5 (Node 11 Leaf Leaf) Leaf
 
 insert :: Ord a => a -> MyBST a -> MyBST a
-insert x Empty = Node x Empty Empty
-insert x (Node v l r)
-  | x < v = Node v (insert x l) r
-  | x > v = Node v l (insert x r)
-  | otherwise = Node v l r
+insert x Leaf = Node x Leaf Leaf
+insert x (Node key left right)
+  | x < key = Node key (insert x left) right
+  | x > key = Node key left (insert x right)
+  | otherwise = Node key left right
 
 --invalidInsert :: Ord a => a -> MyBST a -> MyBST a
---invalidInsert x Empty = Node x Empty Empty
---invalidInsert x (Node v l r)
---  | x < v = Node v l (insert x r)
---  | x > v = Node v l (insert x r)
---  | otherwise = Node v l r
+--invalidInsert x Leaf = Node x Leaf Leaf
+--invalidInsert x (Node key l right)
+--  | x < key = Node key left (insert x right)
+--  | x > key = Node key left (insert x right)
+--  | otherwise = Node key left right
