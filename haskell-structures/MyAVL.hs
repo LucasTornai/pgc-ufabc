@@ -193,3 +193,10 @@ insR a (Node v l r _)
 -- This is probably a bug in Liquid Haskell, the tutorial doesn't have this invariant and breaks.
 -- It should be computed from the other definitions we describe in the code.
 {-@ invariant {v: AVL a | getHeight v == realHeight v} @-}
+
+{-{-@ insertWrong :: a -> s:AVL a -> {t: AVL a | eqOrUp s t} @-}
+insertWrong y Leaf = singleton y
+insertWrong y t@(Node x _ _ _)
+  | y < x     = insR y t
+  | y > x     = insR y t
+  | otherwise = t-}
