@@ -1,128 +1,195 @@
-import Data.So
+||| A key-value tree data structure.
+|||
+||| This structure doesn't encode the invariants of the tree and is
+||| *simply* a container. This structure ideally shouldn't be exposed
+||| to the user at all. This structure should be used to build other
+||| data structures.  See the modules alongside this for appropriate
+||| interfaces for using the tree.
+|||
+||| @keyTy The type associated with the key.
+data Tree : (keyTy : Type)
+         -> Type
+  where
+    ||| An empty Tree node.
+    Empty : Tree k
 
-data Tree : (a: Type) -> Type where
-  Empty : Tree a
-  Node  : (l: Tree a) -> (v: a) -> (r: Tree a) -> Tree a
+    ||| A Key Value node in the Tree.
+    |||
+    ||| @key   The key.
+    ||| @left  The left child of the Node
+    ||| @right THe right child of the Node.
+    Node : (key   : k)
+        -> (left  : Tree k)
+        -> (right : Tree k)
+        -> Tree k
 
-minVal : Ord a => Tree a -> Maybe a
-minVal Empty            = Nothing
-minVal (Node Empty v _) = Just v
-minVal (Node l v r)     = minVal l
+%name Tree t, tree
 
-maxVal : Ord a => Tree a -> Maybe a
-maxVal Empty            = Nothing
-maxVal (Node _ v Empty) = Just v
-maxVal (Node l v r)     = maxVal r
+ -- ------------------------------------------------------------- [ Definitions ]
+data Balance : Nat -> Nat -> Type where
+  LHeavy   : Balance (S n) n
+  RHeavy   : Balance n     (S n)
+  Balanced : Balance n     n
 
-less : Ord a => a -> Tree a -> Bool
-less x node = case minVal node of
-                   Nothing => True
-                   Just v  => x < v
+%name Balance b, bal
 
-more : Ord a => a -> Tree a -> Bool
-more x node = case maxVal node of
-                   Nothing => True
-                   Just v  => x >= v
+||| Indirection ensures that it reduces to at least S n' without
+||| needing to case split on balance.
+|||
+||| Should make proofs easier.
+height : Balance n m -> Nat
+height b = S (height' b)
+  where
+    height' : Balance n m -> Nat
+    height' (LHeavy {n}) = S n
+    height' (RHeavy {n}) = S n
+    height' {n} (Balanced {n}) = n
 
-IsLft : Ord a => (x:a) -> (l:Tree a) -> Type
-IsLft x l = So (more x l)
 
-IsRgt : Ord a => (x:a) -> (r:Tree a) -> Type
-IsRgt x r = So (less x r)
+||| Encoding of the AVL tree height invariants.
+|||
+||| @height The height of a Tree.
+||| @tree   The tree whose height we are capturing.
+data AVLInvariant : (height : Nat)
+                 -> (tree   : Tree k)
+                 -> Type
+  where
+    ||| A tree of height zero.
+    AVLEmpty : AVLInvariant 0 Empty
+    ||| A Balanced tree.
+    |||
+    ||| @left  The invariant of the left child.
+    ||| @right The invariant of the right child.
+    ||| @b     The encoding of the nodes' balance.
+    AVLNode : (left  : AVLInvariant n l)
+           -> (right :  AVLInvariant m r)
+           -> (b : Balance n m)
+           -> AVLInvariant (height b) (Node k l r)
 
-mkIsLft : Ord a => (x:a) -> (l:Tree a) -> Maybe (IsLft x l)
-mkIsLft x l =
-  case (choose (more x l)) of
-       Left proofYes => Just proofYes
-       Right proofNo => Nothing
+%name AVLInvariant inv
 
-mkIsRgt : Ord a => (x:a) -> (r:Tree a) -> Maybe (IsRgt x r)
-mkIsRgt x r =
-  case (choose (less x r)) of
-       Left proofYes => Just proofYes
-       Right proofNo => Nothing
+||| An AVL Tree.
+|||
+||| Modelled using subset to separate the invariants from the tree
+||| implementation itself.
+|||
+||| @height  The height of the Tree.
+||| @keyTy   The type associated with the keys.
+AVLTree : (height  : Nat)
+       -> (keyTy   : Type)
+       -> Type
+AVLTree n k = Subset (Tree k) (AVLInvariant n)
 
-t1 : Tree Int
-t1 = Node Empty 5 Empty
+-- --------------------------------------------------------------- [ Rotations ]
+data InsertRes : Nat -> (k : Type) -> Type where
+  Same : AVLTree n k     -> InsertRes n k
+  Grew : AVLTree (S n) k -> InsertRes n k
 
-t2 : Tree Int
-t2 = Node Empty 2 Empty
+%name InsertRes res, r
 
-t3 : Tree Int
-t3 = Node t2 4 t1
+||| Process the result of an insertion of a new Key-Value pair into
+||| the Tree, returning the new tree and proof of the new tree's
+||| height.
+|||
+||| `InsertRes` is obtained from the result of running `Tree.insert`.
+runInsertRes : InsertRes n k -> (n : Nat ** AVLTree n k)
+runInsertRes (Same t) = (_ ** t)
+runInsertRes (Grew t) = (_ ** t)
 
-data IsBST : (t : Tree a) -> Type where
-  IsBSTZero : IsBST Empty
-  IsBSTOne  : Ord a => (x:a) -> IsBST (Node Empty x Empty)
-  IsBSTLft  : Ord a => (x:a) -> (l:Tree a) -> (IsLft x l) -> (IsBST l) -> (IsBST (Node l x Empty))
-  IsBSTRgt  : Ord a => (x:a) -> (r:Tree a) -> (IsRgt x r) -> (IsBST r) -> (IsBST (Node Empty x r))
-  IsBSTMore : Ord a => (x:a) -> (l:Tree a) -> (r:Tree a) -> (IsLft x l) -> (IsRgt x r) -> (IsBST l) -> (IsBST r) -> (IsBST (Node l x r))
+||| Perform a Left rotation.
+rotLeft : k
+       -> AVLTree n k
+       -> AVLTree (S (S n)) k
+       -> InsertRes (S (S n)) k
+-- Impossible because Empty has depth 0 and we know the depth is at least 2 from the type
+rotLeft key l (Element Empty AVLEmpty) impossible
 
-mkIsBST : Ord a => (t : Tree a) -> Maybe (IsBST t)
-mkIsBST Empty = Just IsBSTZero
-mkIsBST (Node Empty x Empty) = Just (IsBSTOne x)
-mkIsBST (Node l x Empty) = do proofLeft <- mkIsLft x l
-                              proofLBST <- mkIsBST l
-                              Just (IsBSTLft x l proofLeft proofLBST)
-mkIsBST (Node Empty x r) = do proofRight <- mkIsRgt x r
-                              proofRBST <- mkIsBST r
-                              Just (IsBSTRgt x r proofRight proofRBST)
-mkIsBST (Node l x r) = do proofLeft  <- mkIsLft x l
-                          proofRight <- mkIsRgt x r
-                          proofLBST  <- mkIsBST l
-                          proofRBST  <- mkIsBST r
-                          Just (IsBSTMore x l r proofLeft proofRight proofLBST proofRBST)
+rotLeft key (Element l invl) (Element (Node key' rl rr) (AVLNode invrl invrr Balanced)) =
+    Grew $ Element (Node key' (Node key l rl) rr)
+                        (AVLNode (AVLNode invl invrl RHeavy) invrr LHeavy)
 
-height: Ord a => Tree a -> Int
-height Empty = 0
-height (Node l v r) = 1 + (max (height l) (height r))
+rotLeft key (Element l invl) (Element (Node key' (Node key'' rll rlr) rr) (AVLNode (AVLNode invrll invrlr LHeavy) invrr LHeavy)) =
+    Same $ Element (Node key'' (Node key l rll) (Node key' rlr rr)) -- Needs Checking
+                   (AVLNode (AVLNode invl invrll Balanced) (AVLNode invrlr invrr RHeavy) Balanced)
 
-isImba: Int -> Int -> Bool
-isImba x y = (x - 1) > y
+rotLeft key (Element l invl) (Element (Node key' (Node key'' rll rlr) rr) (AVLNode (AVLNode invrll invrlr RHeavy) invrr LHeavy)) =
+    Same $ Element (Node key'' (Node key l rll) (Node key' rlr rr))
+                   (AVLNode (AVLNode invl invrll LHeavy) (AVLNode invrlr invrr Balanced) Balanced)
 
-isBal: Ord a => Tree a -> Bool
-isBal Empty = True
-isBal (Node l v r) =
-  let hl = height l
-      hr = height r
-  in (not (isImba hl hr) && not (isImba hr hl))
+rotLeft key (Element l invl) (Element (Node key' (Node key'' rll rlr) rr) (AVLNode (AVLNode invrll invrlr Balanced) invrr LHeavy)) =
+    Same $ Element (Node key'' (Node key l rll) (Node key' rlr rr))
+                   (AVLNode (AVLNode invl invrll Balanced) (AVLNode invrlr invrr Balanced) Balanced) -- Needs Checking
 
-IsBal : Ord a => Tree a -> Type
-IsBal x = So (isBal x)
+rotLeft key (Element l invl) (Element (Node key' rl rr) (AVLNode invrl invrr RHeavy)) =
+    Same $ Element (Node key' (Node key l rl) rr)
+                   (AVLNode (AVLNode invl invrl Balanced) invrr Balanced)
 
-data IsBalanced : (t : Tree a) -> Type where
-  IsBalancedZero : IsBalanced Empty
-  IsBalancedOne  : Ord a => (x: a) -> IsBalanced (Node Empty x Empty)
-  IsBalancedLft  : Ord a => (x: a) -> (l: Tree a) -> (IsBal (Node l x Empty)) -> (IsBalanced l)-> IsBalanced (Node l x Empty)
-  IsBalancedRgt  : Ord a => (x: a) -> (r: Tree a) -> (IsBal (Node Empty x r)) -> (IsBalanced r) -> IsBalanced (Node Empty x r)
-  IsBalancedMore : Ord a => (x: a) -> (l: Tree a) -> (r: Tree a) -> (IsBal (Node l x r)) -> (IsBalanced l) -> (IsBalanced r) -> IsBalanced (Node l x r)
+||| Perform a Right rotation.
+rotRight : k
+        -> AVLTree (S (S n)) k
+        -> AVLTree n k
+        -> InsertRes (S (S n)) k
+rotRight key (Element Empty AVLEmpty) r impossible
 
---data IsAVL : Tree a -> Type where
---  IsAVLTree: Ord a => (t: Tree a) -> (IsBST t) -> (IsBalanced t) -> IsAVL t
+rotRight key'' (Element (Node key ll (Node key' lrl lrr))
+             (AVLNode invll (AVLNode invlrl invlrr RHeavy) RHeavy)) (Element r invr) =
+  Same $ Element (Node key' (Node key ll lrl) (Node key'' lrr r))
+                 (AVLNode (AVLNode invll invlrl LHeavy) (AVLNode invlrr invr Balanced) Balanced)
+rotRight key'' (Element (Node key ll (Node key' lrl lrr))
+             (AVLNode invll (AVLNode invlrl invlrr LHeavy) RHeavy)) (Element r invr) =
+  Same $ Element (Node key' (Node key ll lrl) (Node key'' lrr r))
+                 (AVLNode (AVLNode invll invlrl Balanced) (AVLNode invlrr invr RHeavy) Balanced)
+rotRight key (Element (Node key' ll lr) (AVLNode invll invlr Balanced)) (Element r invr) =
+  Grew $ Element (Node key' ll (Node key lr r))
+                 (AVLNode invll (AVLNode invlr invr LHeavy) RHeavy)
 
-insert: Ord a => (x: a) -> (t: Tree a) -> (IsBST t) -> (IsBalanced t) -> (t' : (Tree a) ** (IsBST t', IsBalanced t'))
-insert x Empty IsBSTZero IsBalancedZero = ((Node Empty x Empty) ** (IsBSTOne x, IsBalancedOne x))
-insert x (Node Empty y Empty) (IsBSTOne y) (IsBalancedOne y) =
-  let (tx ** (pbstx, pbalx)) = insert x Empty IsBSTZero IsBalancedZero
-  in case choose (more y tx) of
-          Left prfLft => case choose (isBal (Node tx y Empty)) of
-                              Left prfBLft => ((Node tx y Empty) ** (IsBSTLft y tx prfLft pbstx, IsBalancedLft y tx prfBLft pbalx))
-                              Right _ => ?aaa
-          Right _     => case choose (less y tx) of
-                              Left prfRgt => case choose (isBal (Node Empty y tx)) of
-                                                  Left prfBRgt => ((Node Empty y tx) ** (IsBSTRgt y tx prfRgt pbstx, IsBalancedRgt y tx prfBRgt pbalx))
-                                                  Right _      => ((Node Empty y Empty) ** (IsBSTOne y, IsBalancedOne y))
-                              Right _     => ((Node Empty y Empty) ** (IsBSTOne y, IsBalancedOne y))
-insert x (Node l y Empty) (IsBSTLft y l isLftPrf lPrf) (IsBalancedLft y l isBalPrf lBalPrf) =
-  let (tx ** (pbstx, pbalx)) = insert x Empty IsBSTZero IsBalancedZero
-      (tl ** (pbstl, pball)) = insert x l lPrf lBalPrf
-  in case choose (less y tx) of
-          Left prfRgt => case choose (isBal (Node l y tx)) of
-                              Left prfBRgt => (Node l y tx ** (IsBSTMore y l tx isLftPrf prfRgt lPrf pbstx, IsBalancedMore y l tx prfBRgt lBalPrf pbalx))
-                              Right _ => ?bbb
-          Right _ => case choose (more y tl) of
-                          Left prfLft => case choose (isBal (Node tl y Empty)) of
-                                              Left prfBLft => ((Node tl y Empty) ** (IsBSTLft y tl prfLft pl, IsBalancedLft y tl prfBLft pball))
-                                              Right _ => ?ccc
-                          Right _     => ((Node l y Empty) ** (IsBSTLft y l isLftPrf lPrf, IsBalancedLft  y l isBalPrf lBalPrf))
- 
+rotRight key (Element (Node key' ll lr) (AVLNode invll invlr LHeavy)) (Element r invr) =
+  Same $ Element (Node key' ll (Node key lr r))
+                 (AVLNode invll (AVLNode invlr invr Balanced) Balanced)
+
+rotRight key (Element (Node key' ll (Node key'' lrl lrr))
+             (AVLNode invll (AVLNode invlrl invlrr Balanced) RHeavy)) (Element r invr) =
+  Same $ Element (Node key'' (Node key' ll lrl) (Node key lrr r))
+                 (AVLNode (AVLNode invll invlrl Balanced) (AVLNode invlrr invr Balanced) Balanced)
+
+
+ --------------------------------------------------------------- [ Insertion ]
+
+||| Perform an insertion into the tree returning the new tree wrapped
+||| in a description describing the height change.
+doInsert : (Ord k)
+         => k
+         -> AVLTree n k
+         -> InsertRes n k
+doInsert newKey (Element Empty AVLEmpty) = Grew (Element (Node newKey Empty Empty)
+                                                       (AVLNode AVLEmpty AVLEmpty Balanced))
+doInsert newKey (Element (Node key l r) (AVLNode invl invr b)) with (compare newKey key)
+  doInsert newKey (Element (Node key l r) (AVLNode invl invr b)) | EQ = Same (Element (Node newKey l r) (AVLNode invl invr b))
+
+  doInsert newKey (Element (Node key l r) (AVLNode invl invr b)) | LT with (assert_total $ doInsert newKey (Element l invl))
+    -- Totality checker not clever enough to see that this is smaller
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr b))        | LT | (Same (Element l' invl'))
+                                                                               = Same $ Element (Node key l' r) (AVLNode invl' invr b)
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr LHeavy))   | LT | (Grew (Element l' invl'))
+                                                                               = rotRight key (Element l' invl') (Element r invr)
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr Balanced)) | LT | (Grew (Element l' invl'))
+                                                                               = Grew $ Element (Node key l' r) (AVLNode invl' invr LHeavy)
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr RHeavy))   | LT | (Grew (Element l' invl'))
+                                                                               = Same $ Element (Node key l' r) (AVLNode invl' invr Balanced)
+
+  doInsert newKey (Element (Node key l r) (AVLNode invl invr b)) | GT with (assert_total $ doInsert newKey (Element r invr))
+  -- Totality checker not clever enough to see that this is smaller
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr b))        | GT | (Same (Element r' invr'))
+                                                                               = Same $ Element (Node key l r') (AVLNode invl invr' b)
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr LHeavy))   | GT | (Grew (Element r' invr'))
+                                                                               = Same $ Element (Node key l r') (AVLNode invl invr' Balanced)
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr Balanced)) | GT | (Grew (Element r' invr'))
+                                                                               = Grew $ Element (Node key l r') (AVLNode invl invr' RHeavy)
+    doInsert newKey (Element (Node key l r) (AVLNode invl invr RHeavy))   | GT | (Grew (Element r' invr'))
+                                                                               = rotLeft key (Element l invl) (Element r' invr')
+
+||| Insert a key value pair into the tree, returning a the new tree
+||| and possibly its new height.
+insert : Ord k => k -> AVLTree n k -> (n : Nat ** AVLTree n k)
+insert k t = runInsertRes (doInsert k t)
+
