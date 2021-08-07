@@ -193,3 +193,13 @@ doInsert newKey (Element (Node key l r) (AVLNode invl invr b)) with (compare new
 insert : Ord k => k -> AVLTree n k -> (n : Nat ** AVLTree n k)
 insert k t = runInsertRes (doInsert k t)
 
+||| AVL instance implementation
+|||
+||| @ty The type of the elements in the tree.
+data AVLImpl : (ty : Type) -> Type
+    where
+      MkTree : {a : Type } -> AVLTree n a -> AVLImpl a
+
+||| Insert an element into the Tree.
+insertImpl : (Ord a) => a -> AVLImpl a -> AVLImpl a
+insertImpl a (MkTree t) = MkTree (snd $ insert a t)

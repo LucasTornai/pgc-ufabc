@@ -30,48 +30,12 @@ IsLft x left = So (more x left)
 IsRgt : Ord a => (x:a) -> (right:Tree a) -> Type
 IsRgt x right = So (less x right)
 
-mkIsLft : Ord a => (x:a) -> (left:Tree a) -> Maybe (IsLft x left)
-mkIsLft x left =
-  case (choose (more x left)) of
-       Left proofYes => Just proofYes
-       Right proofNo => Nothing
-
-mkIsRgt : Ord a => (x:a) -> (right:Tree a) -> Maybe (IsRgt x right)
-mkIsRgt x right =
-  case (choose (less x right)) of
-       Left proofYes => Just proofYes
-       Right proofNo => Nothing
-
-t1 : Tree Int
-t1 = Node Leaf 5 Leaf
-
-t2 : Tree Int
-t2 = Node Leaf 2 Leaf
-
-t3 : Tree Int
-t3 = Node t2 4 t1
-
 data IsBST : (t : Tree a) -> Type where
   IsBSTZero : IsBST Leaf
   IsBSTOne  : Ord a => (x:a) -> IsBST (Node Leaf x Leaf)
   IsBSTLft  : Ord a => (x:a) -> (left:Tree a) -> (IsLft x left) -> (IsBST left) -> (IsBST (Node left x Leaf))
   IsBSTRgt  : Ord a => (x:a) -> (right:Tree a) -> (IsRgt x right) -> (IsBST right) -> (IsBST (Node Leaf x right))
   IsBSTMore : Ord a => (x:a) -> (left:Tree a) -> (right:Tree a) -> (IsLft x left) -> (IsRgt x right) -> (IsBST left) -> (IsBST right) -> (IsBST (Node left x right))
-
-mkIsBST : Ord a => (t : Tree a) -> Maybe (IsBST t)
-mkIsBST Leaf = Just IsBSTZero
-mkIsBST (Node Leaf x Leaf) = Just (IsBSTOne x)
-mkIsBST (Node left x Leaf) = do proofLeft <- mkIsLft x left
-                              proofLBST <- mkIsBST left
-                              Just (IsBSTLft x left proofLeft proofLBST)
-mkIsBST (Node Leaf x right) = do proofRight <- mkIsRgt x right
-                              proofRBST <- mkIsBST right
-                              Just (IsBSTRgt x right proofRight proofRBST)
-mkIsBST (Node left x right) = do proofLeft  <- mkIsLft x left
-                          proofRight <- mkIsRgt x right
-                          proofLBST  <- mkIsBST left
-                          proofRBST  <- mkIsBST right
-                          Just (IsBSTMore x left right proofLeft proofRight proofLBST proofRBST)
 
 insert : Ord a => (x : a) -> (t : Tree a) -> (IsBST t) -> (t' : (Tree a) ** (IsBST t'))
 insert x Leaf IsBSTZero  = ((Node Leaf x Leaf) ** (IsBSTOne x))
