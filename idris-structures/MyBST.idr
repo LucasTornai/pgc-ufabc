@@ -66,4 +66,4 @@ insert x (Node left y right) (IsBSTMore y left right isLftPrf isRgtPrf lPrf rPrf
   let (tx ** px) = insert x Leaf IsBSTZero
   in case choose (more y tx) of
           Left _ => insert x left lPrf
-          Right _ => insert x right rPrf 
+          Right _ => insert x right rPrf

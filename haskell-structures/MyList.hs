@@ -1,6 +1,6 @@
-module MyList where
+module List where
 
-data MyList a = Nil | Cons a (MyList a)
+data List a = Nil | Cons a (List a)
 
-insert :: a -> MyList a -> MyList a
+insert :: a -> List a -> List a
 insert = Cons

@@ -1,13 +1,13 @@
 {-# LANGUAGE GADTs, DataKinds #-}
-module MyVector where
+module Vector where
 
 data Nat = Z | S Nat
 
-data MyVector l a where
-  Nil :: MyVector Z a
-  Cons :: a -> MyVector x a -> MyVector (S x) a
+data Vector l a where
+  Nil :: Vector Z a
+  Cons :: a -> Vector x a -> Vector (S x) a
 
-insertVector :: a -> MyVector l a -> MyVector (S l) a
+insertVector :: a -> Vector l a -> Vector (S l) a
 insertVector = Cons
 
 a = Cons 1 Nil
