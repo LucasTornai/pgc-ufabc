@@ -47,24 +47,41 @@ mkIsRgt x r =
 
 data IsBST : (t : Tree a) -> Type where
   IsBSTLeaf : IsBST Leaf
-  IsBSTNode : Ord a => (x: a) -> (left: Tree a) -> (IsLft x left) -> (IsBST left) -> (right: Tree a) -> (IsRgt x right) -> (IsBST right) -> (IsBST (Node x left right))
+  IsBSTNode : Ord a => (x: a) -> (IsBST left) -> (IsLft x left) -> (IsBST right) -> (IsRgt x right) -> (IsBST (Node x left right))
 
 BSTree : Type -> Type
 BSTree a = (t' : (Tree a) ** (IsBST t'))
 
 insert : Ord a => (x : a) -> (t : Tree a ** IsBST t) -> BSTree a
-insert x (Leaf ** IsBSTLeaf)  = 
+insert x (Leaf ** IsBSTLeaf) = 
   let isLftPrf = mkIsLft x Leaf
       isRgtPrf = mkIsRgt x Leaf
-  in  ((Node x Leaf Leaf) ** (IsBSTNode x Leaf isLftPrf IsBSTLeaf Leaf isRgtPrf IsBSTLeaf))
-insert x ((Node y left right) ** (IsBSTNode y left isLftPrf lPrf right isRgtPrf rPrf)) =
+  in  ((Node x Leaf Leaf) ** (IsBSTNode x IsBSTLeaf isLftPrf IsBSTLeaf isRgtPrf))
+insert x ((Node y left right) ** (IsBSTNode y lPrf isLftPrf rPrf isRgtPrf)) =
   case comp y x of
        GT => 
        let (lTree ** pl) = insert x (left ** lPrf)
            isLft         = mkIsLft y lTree
-       in  ((Node y lTree right) ** (IsBSTNode y lTree isLft pl right isRgtPrf rPrf))
+       in  ((Node y lTree right) ** (IsBSTNode y pl isLft rPrf isRgtPrf))
        LT => 
        let (rTree ** pr) = insert x (right ** rPrf)
            isRgt         = mkIsRgt y rTree
-       in  ((Node y left rTree) ** (IsBSTNode y left isLftPrf lPrf rTree isRgt pr))
-       EQ => ((Node y left right) ** (IsBSTNode y left isLftPrf lPrf right isRgtPrf rPrf))
+       in  ((Node y left rTree) ** (IsBSTNode y lPrf isLftPrf pr isRgt))
+       EQ => ((Node y left right) ** (IsBSTNode y lPrf isLftPrf rPrf isRgtPrf))
+
+-- wrongInsert : Ord a => (x : a) -> (t : Tree a ** IsBST t) -> BSTree a
+-- wrongInsert x (Leaf ** IsBSTLeaf)  = 
+--   let isLftPrf = mkIsLft x Leaf
+--       isRgtPrf = mkIsRgt x Leaf
+--   in  ((Node x Leaf Leaf) ** (IsBSTNode x IsBSTLeaf isLftPrf IsBSTLeaf isRgtPrf))
+-- wrongInsert x ((Node y left right) ** (IsBSTNode y lPrf isLftPrf rPrf isRgtPrf)) =
+--   case comp y x of
+--        GT => 
+--        let (lTree ** pl) = insert x (left ** lPrf)
+--            isLft         = mkIsLft y lTree
+--        in  ((Node y right lTree) ** (IsBSTNode y rPrf isRgtPrf pl isLft))
+--        LT => 
+--        let (rTree ** pr) = insert x (right ** rPrf)
+--            isRgt         = mkIsRgt y rTree
+--        in  ((Node y left rTree) ** (IsBSTNode y lPrf isLftPrf pr isRgt))
+--        EQ => ((Node y left right) ** (IsBSTNode y lPrf isLftPrf rPrf isRgtPrf))
