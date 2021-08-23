@@ -52,7 +52,7 @@ data IsBST : (t : Tree a) -> Type where
 BSTree : Type -> Type
 BSTree a = (t' : (Tree a) ** (IsBST t'))
 
-insert : Ord a => (x : a) -> (t : Tree a ** IsBST t) -> BSTree a
+insert : Ord a => (x : a) -> BSTree a -> BSTree a
 insert x (Leaf ** IsBSTLeaf) = 
   let isLftPrf = mkIsLft x Leaf
       isRgtPrf = mkIsRgt x Leaf
@@ -69,7 +69,7 @@ insert x ((Node y left right) ** (IsBSTNode y lPrf isLftPrf rPrf isRgtPrf)) =
        in  ((Node y left rTree) ** (IsBSTNode y lPrf isLftPrf pr isRgt))
        EQ => ((Node y left right) ** (IsBSTNode y lPrf isLftPrf rPrf isRgtPrf))
 
--- wrongInsert : Ord a => (x : a) -> (t : Tree a ** IsBST t) -> BSTree a
+-- wrongInsert : Ord a => (x : a) -> BSTree a -> BSTree a
 -- wrongInsert x (Leaf ** IsBSTLeaf)  = 
 --   let isLftPrf = mkIsLft x Leaf
 --       isRgtPrf = mkIsRgt x Leaf
